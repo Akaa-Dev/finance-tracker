@@ -27,3 +27,12 @@ PostgreSQL could not start because Docker Desktop is paused. Migration execution
 UI was compiled, not visually inspected: responsive navigation uses three columns on small screens, a sidebar on desktop, keyboard focus indicators, semantic labels, and a skip link. Finance pages explicitly identify themselves as placeholders; no balances or fabricated records are displayed.
 
 Only the owner table is migrated. Financial entities, financial calculations, payment posting, ownership checks on real financial records, and financial invariant tests belong to Phase 1. Password recovery/change, rate limiting, production TLS hosting, and backup/restore are outside this milestone and are not represented as complete.
+
+
+## Resolved on 2026-11-03
+
+The Docker pause blocker is resolved. Docker Engine 29.8.0 is available. Before Phase 1 changes, `GRADLE_USER_HOME=/private/tmp/finance-gradle backend/gradlew -p backend test --no-daemon` completed **BUILD SUCCESSFUL in 13s**: all six original tests passed, including real PostgreSQL/Liquibase startup, health 200, login/logout, CSRF rejection, HTTP-only cookies and unauthenticated financial route denial.
+
+Subsequent isolated browser acceptance exercised real backend startup and sign-in to the empty dashboard, then sign-out at desktop and 360px widths. The original paused-Docker failures above are historical, not current blockers. The repository Compose service was additionally started with `up -d --wait` in a fresh temporary project, with a random loopback port to avoid the existing development database. It reported **Healthy**, and `pg_isready` reported **accepting connections**. Only that temporary project's container/volume were removed afterward. The existing development database was not queried or modified.
+
+Phase 0 acceptance is now checked. Full Phase 1 verification details, browser limitations and current commands are recorded in `PHASE_1_VERIFICATION.md`.

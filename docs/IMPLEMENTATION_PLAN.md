@@ -4,26 +4,28 @@ Work milestone-by-milestone, commit/checkpoint changes after each passing milest
 
 ## Phase 0 — repository/bootstrap
 - [x] Create monorepo `/backend`, `/frontend`, `/infrastructure`, `/docs` and root README.
-- [ ] Initialize Spring Boot 4.1.2, Gradle 9.8.2 (Groovy), Java 25, PostgreSQL, Liquibase, Spring Security, validation, Spring Data JPA and health endpoint. Code added; runtime verification pending.
+- [x] Initialize Spring Boot 4.1.2, Gradle 9.8.2 (Groovy), Java 25, PostgreSQL, Liquibase, Spring Security, validation, Spring Data JPA and health endpoint.
 - [x] Initialize React/TypeScript/Vite, router, TanStack Query, Tailwind, and responsive shell/navigation.
 - [x] Add Docker Compose for PostgreSQL and developer run instructions, `.env.example`, `.gitignore`.
-- [ ] Implement minimal secured owner bootstrap/auth flow; no default admin password committed. Code and tests added; PostgreSQL integration/sign-in verification pending.
-- [ ] Verify backend, frontend, migration and health endpoint launch; record exact commands/output.
+- [x] Implement minimal secured owner bootstrap/auth flow; no default admin password committed.
+- [x] Verify backend, frontend, migration and health endpoint launch; record exact commands/output.
 
 **Acceptance:** Fresh clone with documented prerequisites can start Postgres, backend and frontend; a user can authenticate and see an empty dashboard; unauthenticated financial API requests are denied.
 
-Phase 0 status: implementation added, acceptance not yet verified. Explicit user stack override: Java 25, Spring Boot 4.1.2, Groovy Gradle 9.8.2, latest stable Node (26.13.0 at implementation). See `PHASE_0_VERIFICATION.md` for exact checks and limitations. No financial tables/endpoints are claimed complete.
+Phase 0 accepted on 2026-11-03: PostgreSQL migration/health and authentication integration tests pass; desktop and 360px browser sign-in/empty dashboard/sign-out pass. Compose startup also verified in an isolated project. Explicit user stack override remains Java 25, Spring Boot 4.1.2, Groovy Gradle 9.8.2 and latest stable Node (26.13.0 checked on 2026-11-03). See `PHASE_0_VERIFICATION.md` and `PHASE_1_VERIFICATION.md` for evidence.
 
 ## Phase 1 — installment vertical slice (highest priority)
-- [ ] Liquibase plan/due/payment/allocation/account tables with constraints/indexes.
-- [ ] Create-plan service generates correct monthly dues and handles cents/short months.
-- [ ] Create GET list/detail/schedule and POST payment endpoints with validation and ownership.
-- [ ] Allocate partial and advance payments oldest-due-first, under concurrency lock and idempotency key.
-- [ ] Derive outstanding balance and due status from valid financial records.
-- [ ] React plan list/detail/create form, payment modal and progress component.
-- [ ] Unit tests plus PostgreSQL integration tests for listed invariant cases.
+- [x] Liquibase plan/due/payment/allocation/account tables with constraints/indexes.
+- [x] Create-plan service generates correct monthly dues and handles cents/short months.
+- [x] Create GET list/detail/schedule and POST payment endpoints with validation and ownership.
+- [x] Allocate partial and advance payments oldest-due-first, under concurrency lock and idempotency key.
+- [x] Derive outstanding balance and due status from valid financial records.
+- [x] React plan list/detail/create form, payment modal and progress component.
+- [x] Unit tests plus PostgreSQL integration tests for listed invariant cases.
 
 **Acceptance:** Create a €1,200/6-month plan, pay €80, observe outstanding €1,120 and first due remaining €120. Pay another €120 and observe first due zero. Show a human-readable transaction history, no double entry.
+
+Phase 1 accepted on 2026-11-03. Account setup, immutable schedules, plan list/search/detail, partial/advance payments, idempotency, row locks, derived statuses, history and confirmed voids are implemented. No ordinary transaction/recurrence/forecast functionality is claimed. See `PHASE_1_API.md` and `PHASE_1_VERIFICATION.md`.
 
 ## Phase 2 — income and expenses
 - [ ] Cash account balances and account selection; category and actual transaction CRUD with reversals.

@@ -12,6 +12,15 @@ public class ApiProblems extends ResponseEntityExceptionHandler {
         String title = status == 401 ? "Authentication required" : status == 403 ? "Request forbidden" : "Sign-in failed";
         response.getWriter().write("{\"type\":\"about:blank\",\"title\":\"" + title + "\",\"status\":" + status + "}");
     }
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    ResponseEntity<ProblemDetail> expected(org.springframework.web.server.ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(ProblemDetail.forStatusAndDetail(e.getStatusCode(),
+            e.getReason()==null ? "Request could not be completed." : e.getReason()));
+    }
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    ResponseEntity<ProblemDetail> conflict(org.springframework.dao.DataIntegrityViolationException e) {
+        return ResponseEntity.status(409).body(ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,"Request conflicts with existing records."));
+    }
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> unexpected(Exception exception) {
         return ResponseEntity.internalServerError().body(ProblemDetail.forStatusAndDetail(

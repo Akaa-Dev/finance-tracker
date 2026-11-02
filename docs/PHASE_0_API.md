@@ -1,4 +1,6 @@
-# Phase 0 API
+# Phase 0 authentication API
+
+Phase 1 financial endpoints are now implemented; see `PHASE_1_API.md`. The authentication contracts below remain unchanged.
 
 | Method | Path | Contract |
 |---|---|---|

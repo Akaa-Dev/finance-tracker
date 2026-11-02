@@ -1,3 +1,5 @@
+> Phase 1 completed on 2026-11-03. This prompt is historical; use `NEXT_PHASE_2_PROMPT.md` next.
+
 # Next prompt — Phase 1
 
 Read AGENTS.md, README.md, docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/IMPLEMENTATION_PLAN.md and docs/PHASE_0_VERIFICATION.md before editing. Keep Java 25, Spring Boot 4.1.2, Groovy Gradle 9.8.2, and Node 26.13.0 or a newer stable version verified against the official Node index. First verify pending Phase 0 acceptance against a running Docker daemon and correct any foundation issues.

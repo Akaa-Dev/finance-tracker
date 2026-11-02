@@ -6,3 +6,10 @@ databaseChangeLog:
         - sqlFile:
             path: 001-owner.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: 002-installments
+      author: finance-tracker
+      changes:
+        - sqlFile:
+            path: 002-installments.sql
+            relativeToChangelogFile: true
