@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-owner
+      author: finance-tracker
+      changes:
+        - sqlFile:
+            path: 001-owner.sql
+            relativeToChangelogFile: true
