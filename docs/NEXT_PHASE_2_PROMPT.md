@@ -1,3 +1,5 @@
+> Phase 2 completed on 2026-11-03. This prompt is historical; use `NEXT_PHASE_3_PROMPT.md` next.
+
 # Next prompt — Phase 2
 
 Read AGENTS.md, README.md, docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/IMPLEMENTATION_PLAN.md, docs/PHASE_0_VERIFICATION.md, docs/PHASE_1_VERIFICATION.md and docs/PHASE_1_API.md before editing. Inspect the current code and summarize the Phase 2 plan first. Retain Java 25, Spring Boot 4.1.2, Gradle 9.8.2 (Groovy) and the latest stable Node verified against the official distribution index. Preserve working authentication and all Phase 1 invariants. Run baseline tests with Docker before making changes.

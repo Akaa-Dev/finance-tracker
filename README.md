@@ -1,6 +1,6 @@
 # Finance Tracker
 
-Private, single-owner finance tracker. **Phase 1:** cash account setup, fixed monthly installment plans, exact-cent schedules, partial/advance payments, payment history and auditable voids. Session authentication and owner-scoped records are enforced. Dashboard summaries, ordinary income/expenses, recurrences and forecasts remain labeled placeholders. No bank connection, analytics, or seeded finance data.
+Private, single-owner finance tracker. **Phase 2:** exact as-of cash balances, ordinary income/expense actuals, auditable corrections/voids, monthly/yearly recurring rules and explicit planned-event reconciliation, alongside Phase 1 installments. Authentication and ownership are enforced. Dashboard debt summaries and forecasts remain labeled placeholders. No bank connection, analytics, or seeded finance data.
 
 ## Prerequisites
 
@@ -40,12 +40,16 @@ npm run dev
 
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and sign in. Use this hostname consistently. Vite proxies the API to loopback port 8080; no cross-origin cookie configuration is needed. PostgreSQL binds to loopback port 5432. Liquibase applies migrations and Hibernate validates mappings.
 
-1. In **Settings**, add a cash account with its actual opening balance/date. This displays the opening position, not a current bank balance.
+1. In **Settings**, add a cash account with its actual opening balance/date. This displays its opening position; Transactions shows the derived as-of balance.
 2. In **Installments**, create a plan with fixed total payable, count and first due date. Schedules keep the anchor day through shorter months and put the cents remainder in the final due.
 3. Open the plan and record actual payments against the cash account. Partial/early payments allocate oldest unpaid dues first. No ordinary expense transaction is created.
 4. Review derived totals, overdue amounts, schedule and history. **Void payment** requires confirmation and retains the original record/allocations.
+5. Add INCOME/EXPENSE categories in **Settings**, then record ordinary actuals in **Transactions**. Do not enter an installment repayment as an ordinary expense or an own-account transfer as income.
+6. Choose account/date filters to see period income, ordinary expenses, installment repayments and net movement separately. Cash as of the end date includes the opening position and all eligible valid history, not only the period's start. Category/direction/record-state filters affect the record list, not the summary.
+7. Create a monthly/yearly rule, explicitly generate its occurrence dates, or create a planned one-off. Neither changes cash. Link an existing actual or choose one source when recording an actual to mark it realized without another movement. Optional source account/category/direction must match; actual amount/date may differ from the nominal expectation.
+8. Corrections require a reason, void the original and append a replacement atomically, transferring compatible source links. Voiding an actual reopens its source; unlinking retains the actual cash movement and reopens the source. All link history is retained. Rule financial fields and planned-event financial fields are immutable; rules may be paused and unrealized planned events cancelled/reopened.
 
-No plan/account editing or deletion is exposed. Choose opening dates and schedules carefully. Payment dates must be on/after the account opening date and no later than today. Balances may become negative; sufficient account funds are not inferred in Phase 1.
+No plan/account editing or deletion is exposed. Ordinary actual corrections append replacement records instead of overwriting history. Choose opening dates and schedules carefully. Payment dates must be on/after the account opening date and no later than today. Balances may become negative; a sufficient-funds restriction is not imposed.
 
 The owner is initialized once at backend startup. Database constraints prevent a second owner. Restarts or environment changes do **not** reset its stored credentials. Password change/recovery is not implemented. Sessions expire after 30 minutes of inactivity and on backend restart. Credentials and financial records are not persisted in browser storage. CSRF uses fresh session tokens for mutations; cookies are HTTP-only and SameSite=Strict. `COOKIE_SECURE=false` is for loopback HTTP only; an HTTPS deployment requires `true`, TLS, same-origin frontend/API routing and deployment hardening.
 
@@ -69,7 +73,7 @@ npm ci
 npm run build
 ```
 
-PostgreSQL integration tests start disposable Testcontainers databases and never use `.env`. They fail visibly if Docker is unavailable. Tests cover auth/CSRF, migrations, precise schedules, allocation, validation, ownership/reference rejection, idempotency, concurrent payment posting, derived statuses and void recomputation.
+PostgreSQL integration tests start disposable Testcontainers databases and never use `.env`. They fail visibly if Docker is unavailable. Tests cover auth/CSRF, migrations, precise schedules/allocation, ownership, idempotency, concurrent payment/actual posting, concurrent realization, correction rollback, opening/as-of boundaries, recurrence anchors and source uniqueness. All cash reads exclude planned definitions and sum installment payments from their separate source exactly once.
 
 Browser acceptance uses a separate disposable database with generated credentials, without reading `.env`. It requires Node, Java 25, Docker, Python 3, curl and free loopback ports 18080/15173:
 
@@ -80,19 +84,26 @@ cd ..
 ./infrastructure/verify-browser.sh
 ```
 
-The script builds/starts a temporary backend, runs Playwright desktop and 360px checks, and cleans up only its own processes/container. Vite's test API target is set with `VITE_API_PROXY`; this value is an address, never a secret. The script never binds or replaces your normal PostgreSQL service. Screenshots are generated under ignored `frontend/test-results/`. No Firefox/WebKit or complete screen-reader audit has been performed.
+The script builds/starts a temporary backend, runs Playwright desktop and 360px checks, and cleans up only its own processes/container. Vite's test API target is set with `VITE_API_PROXY`; this value is an address, never a secret. The script never binds or replaces your normal PostgreSQL service. Screenshots are generated under ignored `frontend/test-results/`. No Firefox/WebKit or complete screen-reader audit has been performed. The isolated backend disables optional local configuration imports with `SPRING_CONFIG_IMPORT=` so local `.env` files are not used.
 
 ## Contracts and verification
 
+- [Phase 2 API examples](docs/PHASE_2_API.md)
 - [Phase 1 API examples](docs/PHASE_1_API.md)
 - [Authentication API and curl sign-in](docs/PHASE_0_API.md)
 - [Phase 0 verification and resolved blockers](docs/PHASE_0_VERIFICATION.md)
 - [Phase 1 verification, results and limitations](docs/PHASE_1_VERIFICATION.md)
+- [Phase 2 verification and limitations](docs/PHASE_2_VERIFICATION.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
-- [Ready-to-paste Phase 2 prompt](docs/NEXT_PHASE_2_PROMPT.md)
+- [Ready-to-paste Phase 3 prompt](docs/NEXT_PHASE_3_PROMPT.md)
 
-`backend/` contains authentication, account and installment APIs/services/domain calculations/JPA mappings. `frontend/` contains the shell and financial forms/views. `infrastructure/` contains local PostgreSQL and isolated browser verification. `docs/` contains the source product/domain contracts and milestone evidence.
+`backend/` contains authentication, accounts, installments, ordinary actuals and recurrence/planned reconciliation APIs/services/JPA mappings. `frontend/` contains the shell and financial forms/views. `infrastructure/` contains local PostgreSQL and isolated browser verification. `docs/` contains the source product/domain contracts and milestone evidence.
 
-Payment posting locks the owner then plan in a transaction. Each request requires an owner-scoped UUID `Idempotency-Key`; identical normalized retries return the **original stored receipt**, including after later payments or a void. Changed reuse returns 409. Read plan detail for current balances. The UI retains the key for unchanged retries while the plan page remains open; after navigation/reload, inspect history before submitting a possibly interrupted payment again. No hypothetical scenarios or automatic transfers exist.
+Payment posting locks the owner then plan in a transaction. Each request requires an owner-scoped UUID `Idempotency-Key`; identical normalized retries return the **original stored receipt**, including after later payments or a void. Changed reuse returns 409. Read plan detail for current balances. The UI retains the key for unchanged retries while the plan page remains open; after navigation/reload, inspect history before submitting a possibly interrupted payment again. No hypothetical scenarios or automatic transfers exist. Phase 2 actual/rule/planned creation, correction and explicit linking use their own shared owner-scoped idempotency receipt table. UI keys persist only while the relevant form/page is mounted; inspect history after navigation/reload before resubmitting an interrupted mutation.
 
-Remaining work: ordinary transactions/current cash balances/recurrences (Phase 2), forecasts (Phase 3), password recovery/rate limiting, backup/restore and production deployment hardening (Phase 4). Optional plan tags and summary/upcoming aggregate endpoints are not exposed. No balances are bank-confirmed.
+Remaining work: forecasts and read-only scenarios (Phase 3), password recovery/rate limiting, backup/restore and production deployment hardening (Phase 4). Optional plan tags and summary/upcoming aggregate endpoints are not exposed. No balances are bank-confirmed.
+
+
+Phase 2's €0 opening + €3,500 salary − €1,300 rent − €80 installment acceptance case is covered by PostgreSQL and browser tests and yields **€2,120**, with only two ordinary actual records. No demo records are seeded into your development database. As-of balances use currently valid history; subsequent voids/corrections restate earlier-date results rather than providing archival historical snapshots.
+
+If your local backend port differs from 8080, start Vite with `VITE_API_PROXY=http://127.0.0.1:<port> npm run dev` from `frontend/`. Existing local configuration edits are retained; the Phase 2 checkpoint excludes them. The normal Compose instructions still require an explicit root `--env-file .env`; do not place secrets in frontend `VITE_` variables.

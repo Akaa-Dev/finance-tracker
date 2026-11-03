@@ -189,4 +189,153 @@ class AuthenticationIntegrationTest {
         service.pay(owner,p.id(),java.util.UUID.randomUUID(),new com.financetracker.installment.api.Contracts.NewPayment(a,new java.math.BigDecimal("100.00"),today,null));
         p=service.get(owner,p.id());assertThat(p.status()).isEqualTo("PAID");assertThat(p.nextDueDate()).isNull();assertThat(p.percentagePaid()).isEqualByComparingTo("100.00");
     }
+
+    @Autowired com.financetracker.transaction.application.LedgerService ledger;
+    @Autowired com.financetracker.recurrence.application.PlanningService planning;
+    java.util.UUID uuid(String s) { return java.util.UUID.fromString(s); }
+    java.util.UUID key() { return java.util.UUID.randomUUID(); }
+    java.util.UUID responseId(String body) { return uuid(JsonPath.read(body,"$.id")); }
+    java.time.LocalDate day(String s) { return java.time.LocalDate.parse(s); }
+    java.math.BigDecimal eur(String s) { return new java.math.BigDecimal(s); }
+    java.util.UUID cash(String balance,String opening) throws Exception {
+        return uuid(id(postJson("/accounts","{\"name\":\"Ledger test\",\"openingBalance\":"+balance+",\"openingDate\":\""+opening+"\"}",null)));
+    }
+    java.util.UUID category(String kind) {
+        return ledger.category(owner(),new com.financetracker.transaction.api.LedgerContracts.NewCategory("Category-"+key(),kind)).id();
+    }
+    com.financetracker.transaction.api.LedgerContracts.NewActual movement(java.util.UUID a,java.util.UUID c,String direction,String amount,String date) {
+        return new com.financetracker.transaction.api.LedgerContracts.NewActual(a,c,direction,eur(amount),day(date),"Fixture",null,null);
+    }
+    com.financetracker.recurrence.api.PlanningContracts.NewRule ruleRequest(java.util.UUID a,java.util.UUID c,String direction) {
+        return new com.financetracker.recurrence.api.PlanningContracts.NewRule("Monthly fixture",a,c,direction,eur("3500.00"),"MONTHLY",day("2026-01-31"),day("2026-01-01"),null);
+    }
+    @Test void phase2AcceptanceAsOfBalancesAndNoInstallmentDoubleEntry() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-11-01");var income=category("INCOME");var expense=category("EXPENSE");
+        ledger.create(owner,key(),movement(a,income,"INCOME","3500.00","2026-11-01"));
+        var rent=responseId(ledger.create(owner,key(),movement(a,expense,"EXPENSE","1300.00","2026-11-02")));
+        var p=uuid(plan("1200.00",6));
+        var payment=responseId(service.pay(owner,p,key(),new com.financetracker.installment.api.Contracts.NewPayment(a,eur("80.00"),day("2026-11-03"),null)));
+        var summary=ledger.summary(owner,a,day("2026-11-01"),day("2026-11-03"));
+        assertThat(summary.income()).isEqualByComparingTo("3500.00");assertThat(summary.ordinaryExpenses()).isEqualByComparingTo("1300.00");
+        assertThat(summary.installmentRepayments()).isEqualByComparingTo("80.00");assertThat(summary.netMovement()).isEqualByComparingTo("2120.00");assertThat(summary.currentBalance()).isEqualByComparingTo("2120.00");
+        assertThat(ledger.balance(owner,a,day("2026-11-02")).currentBalance()).isEqualByComparingTo("2200.00");
+        assertThat(ledger.balance(owner,a,day("2026-10-31")).openingIncluded()).isFalse();
+        assertThat(ledger.balance(owner,a,day("2026-10-31")).currentBalance()).isEqualByComparingTo("0.00");
+        assertThat(jdbc.queryForObject("select count(*) from transactions where account_id=?",Integer.class,a)).isEqualTo(2);
+        ledger.voidActual(owner,rent,"Rent entry reversed");assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("3420.00");
+        service.voidPayment(owner,p,payment);assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("3500.00");
+    }
+    @Test void actualIdempotencyAndConcurrentRetriesAreExact() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("INCOME");var r=movement(a,c,"INCOME","0.10","2026-11-01");var k=key();
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var ready=new java.util.concurrent.CountDownLatch(2);var go=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<String> create=()-> { ready.countDown();go.await();return ledger.create(owner,k,r); };
+            var one=pool.submit(create);var two=pool.submit(create);assertThat(ready.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();go.countDown();
+            assertThat(one.get(10,java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(two.get(10,java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("0.10");
+        assertThatThrownBy(()->ledger.create(owner,k,movement(a,c,"INCOME","0.11","2026-11-01"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        var original=ledger.create(owner,k,movement(a,c,"INCOME","0.1","2026-11-01"));var actual=responseId(original);ledger.voidActual(owner,actual,"Duplicate source cancelled");
+        assertThat(ledger.create(owner,k,r)).isEqualTo(original);assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("0.00");
+    }
+    @Test void recurringMaterializationAndReconciliationNeverPostsAnotherActual() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("INCOME");
+        var rule=responseId(planning.createRule(owner,key(),ruleRequest(a,c,"INCOME")));
+        var range=new com.financetracker.recurrence.api.PlanningContracts.Range(day("2026-01-01"),day("2026-03-31"));
+        var generated=planning.generate(owner,rule,range);assertThat(generated).hasSize(3);assertThat(generated.get(1).occurrenceDate()).isEqualTo(day("2026-02-28"));
+        assertThat(planning.generate(owner,rule,range)).extracting(x->x.id()).containsExactlyElementsOf(generated.stream().map(x->x.id()).toList());
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("0.00");
+        var actual=responseId(ledger.create(owner,key(),movement(a,c,"INCOME","3499.99","2026-02-01")));
+        var source=new com.financetracker.transaction.api.LedgerContracts.Source(generated.getFirst().id(),null);
+        var linked=ledger.link(owner,actual,key(),source);assertThat(linked).contains("occurrenceId");
+        assertThat(planning.occurrences(owner,rule,range.from(),range.to()).getFirst().status()).isEqualTo("REALIZED");
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("3499.99");
+        var another=responseId(ledger.create(owner,key(),movement(a,c,"INCOME","1.00","2026-02-01")));
+        assertThatThrownBy(()->ledger.link(owner,another,key(),source)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        ledger.voidActual(owner,actual,"Wrong salary entry");assertThat(planning.occurrences(owner,rule,range.from(),range.to()).getFirst().status()).isEqualTo("PENDING");
+        ledger.link(owner,another,key(),source);assertThat(planning.occurrences(owner,rule,range.from(),range.to()).getFirst().transactionId()).isEqualTo(another);
+        planning.setActive(owner,rule,false);assertThatThrownBy(()->planning.generate(owner,rule,range)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(planning.occurrences(owner,rule,range.from(),range.to())).hasSize(3);
+    }
+    @Test void correctionTransfersLinkAndRetainsBothFinancialRecords() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("EXPENSE");
+        var planned=responseId(planning.createPlanned(owner,key(),new com.financetracker.recurrence.api.PlanningContracts.NewPlanned("Rent",a,c,"EXPENSE",eur("1300.00"),day("2026-11-01"))));
+        var initial=new com.financetracker.transaction.api.LedgerContracts.NewActual(a,c,"EXPENSE",eur("1300.00"),day("2026-11-01"),null,null,planned);
+        var old=responseId(ledger.create(owner,key(),initial));var k=key();
+        var request=new com.financetracker.transaction.api.LedgerContracts.Correction(movement(a,c,"EXPENSE","1299.99","2026-11-01"),"Correct rent cents");
+        String corrected=ledger.correct(owner,old,k,request);var replacement=responseId(corrected);
+        assertThat(ledger.correct(owner,old,k,request)).isEqualTo(corrected);
+        assertThat(ledger.get(owner,old).voidedAt()).isNotNull();assertThat(ledger.get(owner,old).links().getFirst().unlinkedAt()).isNotNull();
+        assertThat(ledger.get(owner,replacement).supersedesId()).isEqualTo(old);
+        assertThat(planning.planned(owner).stream().filter(p->p.id().equals(planned)).findFirst().orElseThrow().transactionId()).isEqualTo(replacement);
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("-1299.99");
+        var incompatible=new com.financetracker.transaction.api.LedgerContracts.Correction(movement(a,category("INCOME"),"INCOME","1.00","2026-11-01"),"Incompatible direction");
+        assertThatThrownBy(()->ledger.correct(owner,replacement,key(),incompatible)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(ledger.get(owner,replacement).voidedAt()).isNull();assertThat(ledger.get(owner,replacement).links().getFirst().unlinkedAt()).isNull();
+        ledger.voidActual(owner,replacement,"Reverse replacement");assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("0.00");
+        assertThat(planning.planned(owner).stream().filter(p->p.id().equals(planned)).findFirst().orElseThrow().status()).isEqualTo("PLANNED");
+    }
+    @Test void oneActualCannotRealizeMultipleSourcesAndUnlinkRetainsHistory() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("EXPENSE");
+        var req=new com.financetracker.recurrence.api.PlanningContracts.NewPlanned("One off",null,c,"EXPENSE",eur("10.00"),day("2026-11-01"));
+        var first=responseId(planning.createPlanned(owner,key(),req));var second=responseId(planning.createPlanned(owner,key(),req));
+        var actual=responseId(ledger.create(owner,key(),movement(a,c,"EXPENSE","10.00","2026-11-01")));
+        ledger.link(owner,actual,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,first));
+        assertThatThrownBy(()->ledger.link(owner,actual,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,second))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        ledger.unlink(owner,actual,"Wrong source selected");assertThat(ledger.get(owner,actual).links().getFirst().unlinkReason()).isEqualTo("Wrong source selected");
+        ledger.link(owner,actual,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,second));
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("-10.00");
+        assertThatThrownBy(()->planning.status(owner,second,"CANCELLED")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        planning.status(owner,first,"CANCELLED");assertThatThrownBy(()->ledger.link(owner,actual,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,first))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+    @Test void phase2OwnershipValidationPrecisionAndListFilters() throws Exception {
+        login();var owner=owner();var a=cash("-0.01","2026-11-01");var c=category("INCOME");
+        assertThatThrownBy(()->ledger.create(owner,key(),movement(a,c,"EXPENSE","10.00","2026-11-01"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(()->ledger.create(owner,key(),movement(a,c,"INCOME","10.00","2026-10-31"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(()->ledger.balance(key(),a,day("2026-11-01"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        var actual=responseId(ledger.create(owner,key(),movement(a,c,"INCOME","0.02","2026-11-01")));
+        assertThat(ledger.balance(owner,a,day("2026-11-01")).currentBalance()).isEqualByComparingTo("0.01");
+        assertThatThrownBy(()->ledger.get(key(),actual)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(()->ledger.voidActual(key(),actual,"Foreign owner")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(ledger.list(owner,0,1,a,c,"INCOME",day("2026-11-01"),day("2026-11-01"),"VALID").total()).isEqualTo(1);
+        var body="{\"accountId\":\""+a+"\",\"categoryId\":\""+c+"\",\"direction\":\"INCOME\",\"amount\":0.001,\"transactionDate\":\"2026-11-01\"}";
+        assertThat(postJson("/transactions",body,key().toString()).statusCode()).isEqualTo(400);
+        assertThat(postJson("/transactions",body.replace("0.001","0"),key().toString()).statusCode()).isEqualTo(400);
+        assertThat(postJson("/transactions",body.replace("0.001","1.00"),null).statusCode()).isEqualTo(400);
+        assertThat(postJson("/transactions",body.replace("0.001","1.00").replace("2026-11-01","2999-01-01"),key().toString()).statusCode()).isEqualTo(400);
+        assertThat(get("/api/v1/accounts/"+a+"/balance?asOf=2026-11-01").statusCode()).isEqualTo(200);
+        assertThat(get("/api/v1/transactions/summary?accountId="+a+"&from=2026-11-01&to=2026-11-03").statusCode()).isEqualTo(200);
+        assertThat(get("/api/v1/transactions?state=INVALID").statusCode()).isEqualTo(422);
+        assertThatThrownBy(()->ledger.balance(owner,a,day("2999-01-01"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+    @Test void concurrentRealizationHasOnlyOneWinnerAndFailedCreateRollsBack() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("INCOME");
+        var p=responseId(planning.createPlanned(owner,key(),new com.financetracker.recurrence.api.PlanningContracts.NewPlanned("Concurrent",a,c,"INCOME",eur("100.00"),day("2026-11-01"))));
+        var r=new com.financetracker.transaction.api.LedgerContracts.NewActual(a,c,"INCOME",eur("100.00"),day("2026-11-01"),null,null,p);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var ready=new java.util.concurrent.CountDownLatch(2);var go=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<Integer> create=()-> { ready.countDown();go.await();try {ledger.create(owner,key(),r);return 201;}catch(org.springframework.web.server.ResponseStatusException e) {return e.getStatusCode().value();} };
+            var one=pool.submit(create);var two=pool.submit(create);assertThat(ready.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();go.countDown();
+            assertThat(java.util.List.of(one.get(10,java.util.concurrent.TimeUnit.SECONDS),two.get(10,java.util.concurrent.TimeUnit.SECONDS))).containsExactlyInAnyOrder(201,409);
+        }
+        assertThat(jdbc.queryForObject("select count(*) from transactions where account_id=?",Integer.class,a)).isEqualTo(1);
+        assertThat(ledger.balance(owner,a,day("2026-11-03")).currentBalance()).isEqualByComparingTo("100.00");
+    }
+
+    @Test void databaseEnforcesOneActiveSourceAndOwnerMatching() throws Exception {
+        login();var owner=owner();var a=cash("0.00","2026-01-01");var c=category("EXPENSE");
+        var req=new com.financetracker.recurrence.api.PlanningContracts.NewPlanned("Constraint",a,c,"EXPENSE",eur("1.00"),day("2026-11-01"));
+        var first=responseId(planning.createPlanned(owner,key(),req));var second=responseId(planning.createPlanned(owner,key(),req));
+        var actual=responseId(ledger.create(owner,key(),movement(a,c,"EXPENSE","1.00","2026-11-01")));
+        ledger.link(owner,actual,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,first));
+        assertThatThrownBy(()->jdbc.update("insert into actual_links(id,user_id,transaction_id,planned_cashflow_id,linked_at) values(?,?,?,?,now())",key(),owner,actual,second))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        var another=responseId(ledger.create(owner,key(),movement(a,c,"EXPENSE","1.00","2026-11-01")));
+        assertThatThrownBy(()->jdbc.update("insert into actual_links(id,user_id,transaction_id,planned_cashflow_id,linked_at) values(?,?,?,?,now())",key(),owner,another,first))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(()->jdbc.update("insert into actual_links(id,user_id,transaction_id,planned_cashflow_id,linked_at) values(?,?,?,?,now())",key(),key(),another,second))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        ledger.unlink(owner,actual,"Constraint fixture unlink");ledger.link(owner,another,key(),new com.financetracker.transaction.api.LedgerContracts.Source(null,first));
+        assertThat(ledger.get(owner,actual).links()).hasSize(1);assertThat(ledger.get(owner,actual).links().getFirst().unlinkedAt()).isNotNull();
+    }
 }

@@ -13,3 +13,10 @@ databaseChangeLog:
         - sqlFile:
             path: 002-installments.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: 003-cash-ledger
+      author: finance-tracker
+      changes:
+        - sqlFile:
+            path: 003-cash-ledger.sql
+            relativeToChangelogFile: true

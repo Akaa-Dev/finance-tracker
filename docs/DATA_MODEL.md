@@ -41,3 +41,13 @@ For an even fixed schedule, divide total payable by installment count at scale 2
 - Overdue partially paid obligation appears immediately in forecast; payment already posted is not deducted again.
 - Actual salary linked to November recurrence must not be projected again in November.
 - Cash balances roll forward using exact dates, not only monthly arithmetic.
+
+## Phase 2 physical implementation notes
+
+Migration `003-cash-ledger` adds ordinary `transactions`, `categories`, `recurring_rules`, `recurrence_occurrences`, `planned_cashflows`, `actual_links` and `operation_receipts`. Monetary columns are NUMERIC(19,2). Composite owner foreign keys cover account/category/source references. Partial unique indexes on active links enforce one source per actual and one actual per occurrence/planned event.
+
+Actuals are immutable apart from void metadata. A correction atomically voids the old row and appends a replacement with unique `supersedes_id`. Source realization lives in `actual_links` rather than nullable duplicated realization columns: closed link rows retain timestamps/reasons, and the active row identifies the current actual. Voids reopen planned events or leave occurrences PENDING; corrections transfer links only if category/direction/specified account remain compatible. Ordinary actuals and installment payments remain separate physical sources.
+
+Phase 2 idempotency receipts cover actual creation/correction/linking and planned/rule creation; owner locks serialize these with existing installment writes. Receipt snapshots stay immutable after later corrections. Cash reads use a REPEATABLE READ snapshot across opening positions, valid ordinary actuals and valid installment payments. They ignore planned definitions/links entirely, and do not include transfers (no transfer API exists).
+
+Rules retain fixed financial fields; PATCH toggles active only. Planned PATCH changes unrealized status only. Occurrence generation is explicit and bounded (max 730-day range), unique by rule/date, and never posts an actual. Anchor year is a template; monthly uses day and yearly uses month/day with last-day clamping. Active links reconcile whole nominal occurrences/events even if actual amount/date differ. Phase 3 must exclude realized sources using active links joined to valid actuals, without projecting a nominal residual. The forecast engine is not implemented in Phase 2.

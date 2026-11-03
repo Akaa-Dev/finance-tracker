@@ -14,19 +14,19 @@ export function money(value: Money) {
   const parts = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).formatToParts(whole.startsWith('-') && BigInt(whole) === 0n ? -0 : BigInt(whole))
   return parts.map(p => p.type === 'fraction' ? fraction.padEnd(2, '0').slice(0, 2) : p.value).join('')
 }
-function date(value?: string) { return value ? new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value + 'T12:00:00')) : '—' }
-function today() { return new Intl.DateTimeFormat('en-CA').format(new Date()) }
-function message(e: unknown) { return e instanceof ApiError && e.status === 401 ? 'Your session expired. Reload and sign in again.' : e instanceof Error ? e.message : 'Request failed. Please try again.' }
+export function date(value?: string) { return value ? new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value + 'T12:00:00')) : '—' }
+export function today() { return new Intl.DateTimeFormat('en-CA').format(new Date()) }
+export function message(e: unknown) { return e instanceof ApiError && e.status === 401 ? 'Your session expired. Reload and sign in again.' : e instanceof Error ? e.message : 'Request failed. Please try again.' }
 function value(data: FormData, name: string) { return String(data.get(name) ?? '') }
-function Amount({ name, label, signed = false, optional = false }: { name: string; label: string; signed?: boolean; optional?: boolean }) {
+export function Amount({ name, label, signed = false, optional = false }: { name: string; label: string; signed?: boolean; optional?: boolean }) {
   return <label>{label}<input name={name} inputMode="decimal" pattern={signed ? '-?[0-9]+([.][0-9]{1,2})?' : '[0-9]+([.][0-9]{1,2})?'} placeholder="0.00" required={!optional} maxLength={21}/><small>EUR · use a decimal point, up to 2 decimal places</small></label>
 }
-function Modal({ title, close, busy, children }: { title: string; close: () => void; busy: boolean; children: ReactNode }) {
+export function Modal({ title, close, busy, children }: { title: string; close: () => void; busy: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { const dialog = ref.current!; dialog.showModal(); return () => dialog.close() }, [])
   return <dialog ref={ref} className="modal" aria-labelledby={title} onCancel={e => { e.preventDefault(); if (!busy) close() }}>{children}</dialog>
 }
-function QueryError({ error, retry }: { error: unknown; retry: () => void }) { return <div role="alert" className="error">{message(error)} <button onClick={retry}>Try again</button></div> }
+export function QueryError({ error, retry }: { error: unknown; retry: () => void }) { return <div role="alert" className="error">{message(error)} <button onClick={retry}>Try again</button></div> }
 function PlanCard({ plan }: { plan: Plan }) {
   return <Link className="plan-card" to={'/installments/' + plan.id}><div className="row"><div><h2>{plan.name}</h2><p className="muted">{plan.provider}</p></div><span className={'badge ' + plan.status.toLowerCase()}>{plan.status}</span></div>
     <p className="balance">{money(plan.outstandingBalance)} <span className="muted">outstanding</span></p>
@@ -65,7 +65,7 @@ export function Accounts() {
   const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [busy, setBusy] = useState(false)
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); setError(''); setSuccess(''); setBusy(true)
-    try { await jsonMutation('/accounts', { name: value(data, 'name'), openingBalance: value(data, 'openingBalance'), openingDate: value(data, 'openingDate') }); await cache.invalidateQueries({ queryKey: ['accounts'] }); form.reset(); setSuccess('Cash account created.') }
+    try { await jsonMutation('/accounts', { name: value(data, 'name'), openingBalance: value(data, 'openingBalance'), openingDate: value(data, 'openingDate') }); await Promise.all([cache.invalidateQueries({ queryKey: ['accounts'] }), cache.invalidateQueries({ queryKey: ['cash-summary'] }), cache.invalidateQueries({ queryKey: ['balances'] })]); form.reset(); setSuccess('Cash account created.') }
     catch (e) { setError(message(e)) } finally { setBusy(false) }
   }
   return <section className="panel accounts"><h2>Cash accounts</h2><p className="muted">Set an accurate opening position before recording payments. These are opening balances, not current bank balances. Accounts cannot yet be edited.</p>
@@ -80,7 +80,7 @@ export function PlanDetail() {
   const [paying, setPaying] = useState(false); const [voiding, setVoiding] = useState<Payment | null>(null)
   const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [busy, setBusy] = useState(false)
   const pending = useRef<{ key: string; body: string } | null>(null)
-  async function refresh() { await Promise.all([cache.invalidateQueries({ queryKey: ['plan', id] }), cache.invalidateQueries({ queryKey: ['plans'] })]) }
+  async function refresh() { await Promise.all([cache.invalidateQueries({ queryKey: ['plan', id] }), cache.invalidateQueries({ queryKey: ['plans'] }), cache.invalidateQueries({ queryKey: ['cash-summary'] }), cache.invalidateQueries({ queryKey: ['balances'] })]) }
   async function pay(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const data = new FormData(e.currentTarget); const body = { accountId: value(data, 'accountId'), amount: value(data, 'amount'), paidOn: value(data, 'paidOn'), note: value(data, 'note') }
     const encoded = JSON.stringify(body)

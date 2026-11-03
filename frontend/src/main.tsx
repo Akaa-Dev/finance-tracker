@@ -4,6 +4,7 @@ import { BrowserRouter, NavLink, Routes, Route, Navigate } from 'react-router-do
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, mutate, ApiError, type Session } from './api'
 import './style.css'
+import { Transactions, Planning, Categories } from './transactions'
 import { Installments, CreatePlan, PlanDetail, Accounts } from './installments'
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30000 } } })
 const sections = ['Dashboard', 'Installments', 'Transactions', 'Forecast', 'Settings']
@@ -42,17 +43,17 @@ function App() {
     <nav aria-label="Main navigation">{sections.map((name) => <NavLink key={name} to={'/' + name.toLowerCase()}>{name}</NavLink>)}</nav>
     <div className="owner"><span>{session.data.email}</span><button className="secondary" onClick={signOut} disabled={busy}>Sign out</button></div></aside>
     <main id="content" tabIndex={-1}>{error && <p role="alert" className="error">{error}</p>}
-      <Routes><Route path="/" element={<Navigate to="/dashboard" replace/>}/><Route path="/installments" element={<Installments/>}/><Route path="/installments/new" element={<CreatePlan/>}/><Route path="/installments/:id" element={<PlanDetail/>}/>{sections.filter(name => name !== 'Installments').map(name => <Route key={name} path={'/' + name.toLowerCase()} element={<Section name={name} email={session.data.email}/>}/>)}
+      <Routes><Route path="/" element={<Navigate to="/dashboard" replace/>}/><Route path="/installments" element={<Installments/>}/><Route path="/installments/new" element={<CreatePlan/>}/><Route path="/installments/:id" element={<PlanDetail/>}/><Route path="/transactions" element={<Transactions/>}/><Route path="/transactions/recurring" element={<Planning key="recurring" kind="recurring"/>}/><Route path="/transactions/planned" element={<Planning key="planned" kind="planned"/>}/>{sections.filter(name => name !== 'Installments' && name !== 'Transactions').map(name => <Route key={name} path={'/' + name.toLowerCase()} element={<Section name={name} email={session.data.email}/>}/>)}
       <Route path="*" element={<><h1>Page not found</h1><NavLink to="/dashboard">Go to dashboard</NavLink></>}/></Routes>
     </main></div>
 }
 function Section({ name, email }: { name: string; email: string }) {
   return <><header><p className="eyebrow">PERSONAL WORKSPACE · EUR</p><h1>{name}</h1><p className="muted">{name === 'Dashboard' ? 'A clear view starts with your own records.' : 'Your private financial workspace.'}</p></header>
-    <div className="notice">Installment tracking is available. Dashboard summaries, transactions and forecasts are planned.</div>
+    <div className="notice">Installments and actual transactions are available. Dashboard debt summaries and forecasts remain planned.</div>
     {name === 'Settings' ? <section className="panel"><h2>Owner account</h2><dl><dt>Email</dt><dd>{email}</dd><dt>Currency</dt><dd>EUR</dd></dl><p>Session authentication is active. Account editing and password recovery are not available in this phase.</p></section> :
     <section className="panel empty"><div className="symbol" aria-hidden="true">{name === 'Installments' ? '↗' : '○'}</div><h2>{name === 'Dashboard' ? 'Your workspace is ready' : `${name} are planned`}</h2>
-    <p>{name === 'Dashboard' ? 'Sign-in is working. Balances, debt totals and recent activity will appear as the financial features are implemented.' : name === 'Installments' ? 'Plan creation, monthly schedules and partial payments will be added in Phase 1.' : name === 'Transactions' ? 'Income and ordinary expenses will be added in Phase 2. Cash accounts are available in Settings.' : 'Cash flow projections and read-only scenarios will be added in Phase 3.'}</p>
+    <p>{name === 'Dashboard' ? 'Open Transactions for as-of cash balances and actual movement summaries. Dashboard debt totals and recent activity remain planned.' : name === 'Installments' ? 'Plan creation, monthly schedules and partial payments will be added in Phase 1.' : name === 'Transactions' ? 'Income and ordinary expenses will be added in Phase 2. Cash accounts are available in Settings.' : 'Cash flow projections and read-only scenarios will be added in Phase 3.'}</p>
     <span className="badge">Placeholder · No financial data</span></section>}
-    {name === 'Settings' && <Accounts/>}<p className="footnote">Manual entry · No bank connection · No analytics</p></>
+    {name === 'Settings' && <><Accounts/><Categories/></>}<p className="footnote">Manual entry · No bank connection · No analytics</p></>
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClientProvider client={client}><BrowserRouter><App/></BrowserRouter></QueryClientProvider></React.StrictMode>)

@@ -28,12 +28,14 @@ Phase 0 accepted on 2026-11-03: PostgreSQL migration/health and authentication i
 Phase 1 accepted on 2026-11-03. Account setup, immutable schedules, plan list/search/detail, partial/advance payments, idempotency, row locks, derived statuses, history and confirmed voids are implemented. No ordinary transaction/recurrence/forecast functionality is claimed. See `PHASE_1_API.md` and `PHASE_1_VERIFICATION.md`.
 
 ## Phase 2 — income and expenses
-- [ ] Cash account balances and account selection; category and actual transaction CRUD with reversals.
-- [ ] Recurrence rules and future planned one-offs with reconciliation/realization linkage.
-- [ ] Transaction UI, summary of income, ordinary expenses, installment repayments and balances.
-- [ ] Tests for ownership, voids, opening balances and recurrence anchor dates.
+- [x] Cash account balances and account selection; category and actual transaction CRUD with reversals.
+- [x] Recurrence rules and future planned one-offs with reconciliation/realization linkage.
+- [x] Transaction UI, summary of income, ordinary expenses, installment repayments and balances.
+- [x] Tests for ownership, voids, opening balances and recurrence anchor dates.
 
 **Acceptance:** Add €3,500 salary, €1,300 rent, €80 installment payment; app reports cash movement without counting €80 twice, assuming transactions and account opening values are defined.
+
+Phase 2 accepted on 2026-11-03. Owner-scoped ordinary actuals, append-only corrections, reasoned voids, exact as-of balances/period summaries, immutable monthly/yearly rules, explicit occurrence generation and auditable one-to-one source reconciliation are implemented. The EUR 3,500 − EUR 1,300 − EUR 80 acceptance result is EUR 2,120 without an installment expense duplicate. See `PHASE_2_API.md` and `PHASE_2_VERIFICATION.md`. No forecasts/scenarios are implemented.
 
 ## Phase 3 — forecasting and scenario engine
 - [ ] Daily deterministic event projection from actual balances, future recurring/one-off cash flows, remaining installment dues.

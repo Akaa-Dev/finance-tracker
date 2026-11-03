@@ -21,6 +21,8 @@ PY
 set -a
 . "$task_tmp/environment"
 set +a
+# Ignore optional local .env imports when running the disposable test backend.
+export SPRING_CONFIG_IMPORT=''
 docker run --rm -d --name "$task_db" --env-file "$task_tmp/environment" -p 127.0.0.1::5432 postgres:17 >/dev/null
 for task_attempt in $(seq 1 40); do
   if docker exec "$task_db" pg_isready -U finance_test -d finance_test >/dev/null 2>&1; then break; fi
