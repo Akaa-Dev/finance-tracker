@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/finance_tracker}
     username: ${DB_USER}
@@ -10,6 +12,7 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/master.yaml
 server:
+  port: 8081
   address: ${SERVER_ADDRESS:127.0.0.1}
   servlet:
     session:
