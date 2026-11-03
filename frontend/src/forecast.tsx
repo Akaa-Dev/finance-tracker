@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, jsonMutation } from './api'
+import { api, jsonMutation, ApiError } from './api'
 import { date, message, money, QueryError, today } from './installments'
 
 type Event = { date: string; source: string; sourceId?: string; name: string; amount: string; projected: boolean }
@@ -12,6 +12,25 @@ type ScenarioResult = { baseline: ForecastResult; hypothetical: ForecastResult; 
 type Rule = { id: string; name: string; direction: string; active: boolean }
 type Category = { id: string; name: string; kind: string }
 type Account = { id: string; name: string }
+
+function checkedForecast(data: ForecastResult): ForecastResult {
+  if (!data || typeof data.startingDebt !== 'string' || typeof data.endingDebt !== 'string'
+      || !Array.isArray(data.accountBalances) || !Array.isArray(data.days) || !Array.isArray(data.months)
+      || data.days.some(day => typeof day.debtOutstanding !== 'string')
+      || data.months.some(month => typeof month.debtOutstanding !== 'string')) {
+    throw new Error('The backend is running an older Forecast API. Restart the backend, then retry.')
+  }
+  return data
+}
+
+async function cashflow(params: URLSearchParams) {
+  try { return checkedForecast(await api<ForecastResult>('/forecasts/cashflow?' + params)) }
+  catch (cause) {
+    if (cause instanceof ApiError && cause.status === 404)
+      throw new Error('The Forecast route is unavailable. Restart the backend, then retry.')
+    throw cause
+  }
+}
 
 function endAfter(months: number) {
   const current = new Date(today() + 'T12:00:00')
@@ -103,8 +122,8 @@ export function Forecast() {
   const [scenario, setScenario] = useState<ScenarioResult | null>(null)
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const params = new URLSearchParams({ from, to })
-  const forecast = useQuery({ queryKey: ['forecasts', params.toString()], enabled: !!from && !!to && from <= to,
-    queryFn: () => api<ForecastResult>('/forecasts/cashflow?' + params) })
+  const forecast = useQuery({ queryKey: ['forecasts', 'cash-debt-v2', params.toString()], enabled: !!from && !!to && from <= to,
+    queryFn: () => cashflow(params) })
   const rules = useQuery({ queryKey: ['rules'], queryFn: () => api<Rule[]>('/recurring-rules') })
   async function simulate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(''); setScenario(null)
@@ -115,7 +134,11 @@ export function Forecast() {
       : kind === 'INCOME_REDUCTION'
       ? { type: kind, amount, date: String(data.get('date')), ruleId: String(data.get('ruleId')) }
       : { type: kind, amount, date: String(data.get('date')) }
-    try { setScenario(await jsonMutation<ScenarioResult>('/forecasts/scenarios', { from, to, changes: [change] })) }
+    try {
+      const result = await jsonMutation<ScenarioResult>('/forecasts/scenarios', { from, to, changes: [change] })
+      checkedForecast(result.baseline); checkedForecast(result.hypothetical)
+      setScenario(result)
+    }
     catch (cause) { setError(message(cause)) }
     finally { setBusy(false) }
   }

@@ -38,7 +38,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and sign in. Use this hostname consistently. Vite proxies the API to loopback port 8081 in the current local configuration; set `VITE_API_PROXY` if your backend uses another port, and restart Vite after changing the target. The browser Network panel shows `/api` on the Vite origin because forwarding happens server-side. Restart older backend processes after code changes; an old process can accept login while lacking new routes. PostgreSQL binds to loopback port 5432. Liquibase applies migrations and Hibernate validates mappings.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and sign in. Use this hostname consistently. Vite proxies the API to loopback port 8080 in the current configuration; set `VITE_API_PROXY` if your backend uses another port, and restart Vite after changing the target. The browser Network panel shows `/api` on the Vite origin because forwarding happens server-side. Restart the backend after code changes: an older process can accept login while returning an outdated Forecast response. PostgreSQL binds to loopback port 5432. Liquibase applies migrations and Hibernate validates mappings.
 
 1. In **Settings**, add a cash account with its actual opening balance/date. This displays its opening position; Transactions shows the derived as-of balance.
 2. In **Installments**, create a plan with fixed total payable, count and first due date. Schedules keep the anchor day through shorter months and put the cents remainder in the final due.
@@ -109,4 +109,4 @@ Remaining work: password recovery/rate limiting, backup/restore and production d
 
 Phase 2's €0 opening + €3,500 salary − €1,300 rent − €80 installment acceptance case is covered by PostgreSQL and browser tests and yields **€2,120**, with only two ordinary actual records. No demo records are seeded into your development database. As-of balances use currently valid history; subsequent voids/corrections restate earlier-date results rather than providing archival historical snapshots.
 
-If your local backend port differs from 8081, start Vite with `VITE_API_PROXY=http://127.0.0.1:<port> npm run dev` from `frontend/`. The normal Compose instructions still require an explicit root `--env-file .env`; do not place secrets in frontend `VITE_` variables.
+If Forecast briefly loads then disappears, stop the running backend in its terminal and start `./gradlew bootRun` again from `backend/`; refresh the browser. A process started before the latest forecast build cannot return the cash/debt fields expected by the current frontend. The page now reports this mismatch instead of blanking. If the backend port differs from 8080, start Vite with `VITE_API_PROXY=http://127.0.0.1:<port> npm run dev` from `frontend/`. The normal Compose instructions still require an explicit root `--env-file .env`; do not place secrets in frontend `VITE_` variables.

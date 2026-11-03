@@ -41,3 +41,11 @@ Final verification:
 - `git diff --check`: passed after the follow-up edits.
 
 The graph is a projection. It assumes pending dues are paid on their projected dates; only posted payments alter actual balances or actual outstanding debt. The graph combines all accounts and includes account-free expected sources without assigning those expectations to an individual account. Browser coverage remains Chromium only; exhaustive accessibility and other browser engines remain Phase 4 work. Existing user-managed local servers were not restarted.
+
+## Forecast page compatibility fix — 2026-11-03
+
+The local Java process on port 8080 initially started at 22:36, before the cash/debt response classes were compiled at 23:00. Vite served the current page through that old process. Missing `startingDebt`, `endingDebt` and `accountBalances` fields could cause a React render exception after loading. The frontend now validates the forecast response before rendering and displays an actionable restart message for an old or missing Forecast API. A browser regression test substitutes an older response and checks that the page and navigation remain visible.
+
+Verification: pinned-Node `npm run build` passed, 89 modules transformed, reported 529ms. The disposable browser suite passed **8/8 (16.8s)** on desktop and 360px Chromium, including the new older-response case on both viewports. `git diff --check` passed. No backend code changed; the prior clean backend result remains 38 tests passed.
+
+During this work the user-managed backend restarted on port 8080 at 23:04, after the new classes were compiled. Authenticated, read-only localhost checks returned login 204 and Forecast GET 200 both directly on 8080 and through Vite on 5173; the required cash/debt/account fields were present. A separate read-only headless browser check against the live app reported Forecast visible, graph visible and no visible alert. These checks printed no credentials or financial values. Existing browser sessions may need refresh and sign-in after the backend restart.
