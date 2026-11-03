@@ -31,7 +31,7 @@ function useAction() {
     try {
       await jsonMutation(path, body, keyed ? pending.current.key : undefined, method)
       pending.current = null
-      await Promise.all(['actuals', 'cash-summary', 'balances', 'categories', 'rules', 'occurrences', 'planned'].map(key => cache.invalidateQueries({ queryKey: [key] })))
+      await Promise.all(['actuals', 'cash-summary', 'balances', 'categories', 'rules', 'occurrences', 'planned', 'forecasts'].map(key => cache.invalidateQueries({ queryKey: [key] })))
       setSuccess(success); done?.()
     } catch (e) { setError(message(e) + (keyed ? ' Retry unchanged to reuse the request key. After reload, inspect history before resubmitting.' : '')) }
     finally { setBusy(false) }

@@ -60,5 +60,7 @@ Response: baseline + hypothetical monthly and daily results, deltas, minimum cas
 5. Aggregate chronologically, including running lowest balance for each day. Monthly values are derived from chronological events; reported net income must not count transfers between own accounts as income.
 6. Forecast is a projection, not a bank-verified prediction. No background interest or auto-updates.
 
+Phase 3 implementation derives both baseline and hypothetical results from one owner-scoped, read-only REPEATABLE READ snapshot. It returns daily rows, monthly rows and dated source events. Actuals through today remain separate from future nominal expectations. A future selected start carries prior future expectations into its starting balance, while previously overdue dues are charged on the selected start. Scenario changes are validated and applied in memory; no scenario tables or migrations are needed. See `PHASE_3_API.md` for the implemented request fields and response shape.
+
 ## Operational
 Compose services for PostgreSQL, backend and frontend (or local frontend dev server). Use Liquibase at boot, PostgreSQL in tests via Testcontainers, actuator health endpoint if configured, environment-based secrets, and backup/recovery documentation. Never put personal financial data in seeded demo records by default.

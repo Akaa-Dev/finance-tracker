@@ -4,8 +4,9 @@
 Build a production-minded, private, responsive personal finance web application for tracking installments, partial repayments, income, expenses, and future cash flow. The source of truth is `docs/PRODUCT_SPEC.md`, with domain and technical details in `docs/ARCHITECTURE.md` and `docs/DATA_MODEL.md`. Follow the staged implementation and acceptance criteria in `docs/IMPLEMENTATION_PLAN.md`.
 
 ## Stack and conventions
-- Backend: Java 21 LTS, Spring Boot 3.x (choose a supported patch), Maven, Spring Web, Validation, Security, Spring Data JPA, Liquibase, PostgreSQL. Check current supported versions when provisioning; avoid prerelease versions.
+- Backend: Java 25, Spring Boot 4.1.2, Gradle 9.8.2 (Groovy), Spring Web, Validation, Security, Spring Data JPA, Liquibase, PostgreSQL. Avoid prerelease versions.
 - Frontend: React, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS; use accessible components and responsive layouts.
+- Node: use the latest verified stable release pinned in `.nvmrc` and keep the version documented in README.
 - Monorepo: `backend/`, `frontend/`, `infrastructure/`, `docs/`.
 - Backend modules: `auth`, `account`, `installment`, `transaction`, `recurrence`, `forecast`, `dashboard`, `common`.
 - Single-user MVP via authenticated application user, but every financial record is owner-scoped. EUR only initially; no multi-currency arithmetic.

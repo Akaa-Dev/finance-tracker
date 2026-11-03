@@ -38,13 +38,15 @@ Phase 1 accepted on 2026-11-03. Account setup, immutable schedules, plan list/se
 Phase 2 accepted on 2026-11-03. Owner-scoped ordinary actuals, append-only corrections, reasoned voids, exact as-of balances/period summaries, immutable monthly/yearly rules, explicit occurrence generation and auditable one-to-one source reconciliation are implemented. The EUR 3,500 − EUR 1,300 − EUR 80 acceptance result is EUR 2,120 without an installment expense duplicate. See `PHASE_2_API.md` and `PHASE_2_VERIFICATION.md`. No forecasts/scenarios are implemented.
 
 ## Phase 3 — forecasting and scenario engine
-- [ ] Daily deterministic event projection from actual balances, future recurring/one-off cash flows, remaining installment dues.
-- [ ] Handle overdue, partially paid, actual-reconciled recurring and planned realized events.
-- [ ] Monthly rollups, lowest daily balance, baseline vs scenario deltas.
-- [ ] Forecast and what-if UI including mobile-friendly tables/charts.
-- [ ] Deterministic tests for boundary dates and double counting.
+- [x] Daily deterministic event projection from actual balances, future recurring/one-off cash flows, remaining installment dues.
+- [x] Handle overdue, partially paid, actual-reconciled recurring and planned realized events.
+- [x] Monthly rollups, lowest daily balance, baseline vs scenario deltas.
+- [x] Forecast and what-if UI including mobile-friendly tables/charts.
+- [x] Deterministic tests for boundary dates and double counting.
 
 **Acceptance:** Forecast explicitly itemizes sources; altering a hypothetical future installment changes only simulation output, not stored plan/payment/transaction records.
+
+Phase 3 accepted on 2026-11-03 against the disposable PostgreSQL/browser environments: source-itemized daily/monthly forecasts, realized-source suppression, partial/overdue due handling, and read-only what-if comparisons are implemented. The final clean backend suite passed 35 tests; the final desktop and 360px Chromium suite passed 6 cases. Hypothetical installment tests assert changed results and no stored plan/payment/transaction rows. See `PHASE_3_API.md` and `PHASE_3_VERIFICATION.md`. Phase 4 remains unchecked.
 
 ## Phase 4 — hardening
 - [ ] Session/CSRF and permission review, rate limiting where needed, errors/validation and logging hygiene.

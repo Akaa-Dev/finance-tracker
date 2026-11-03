@@ -10,7 +10,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T
   // Preserve server money decimals before JSON parsing can round them to binary floats.
   const text = await response.text()
-  return JSON.parse(text.replace(/("(?:amount|openingBalance|principalAmount|totalPayable|allocated|remaining|dueRemaining|totalPaid|outstandingBalance|planOutstandingBalance|percentagePaid|overdueAmount|plannedAmount|income|ordinaryExpenses|installmentRepayments|netMovement|currentBalance)"\s*:\s*)(-?\d+(?:\.\d+)?)(?=\s*[,}])/g, '$1"$2"')) as T
+  return JSON.parse(text.replace(/("(?:amount|openingBalance|principalAmount|totalPayable|allocated|remaining|dueRemaining|totalPaid|outstandingBalance|planOutstandingBalance|percentagePaid|overdueAmount|plannedAmount|income|ordinaryExpenses|installmentRepayments|netMovement|currentBalance|startingBalance|endingBalance|lowestDailyBalance|openingPositions|endingBalanceDelta|lowestBalanceDelta)"\s*:\s*)(-?\d+(?:\.\d+)?)(?=\s*[,}])/g, '$1"$2"')) as T
 }
 export async function mutate(path: string, body?: URLSearchParams) {
   // Fetch a fresh session CSRF token after each login/logout rotation.
