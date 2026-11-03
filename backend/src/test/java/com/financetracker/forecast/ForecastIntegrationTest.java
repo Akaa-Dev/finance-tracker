@@ -2,6 +2,8 @@ package com.financetracker.forecast;
 
 import com.financetracker.forecast.application.ForecastService;
 import com.financetracker.forecast.api.ForecastContracts.*;
+import com.financetracker.recurrence.application.PlanningService;
+import com.financetracker.recurrence.api.PlanningContracts.NewRule;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
 import java.net.*;
@@ -31,6 +33,7 @@ class ForecastIntegrationTest {
     }
     @Autowired JdbcTemplate db;
     @Autowired ForecastService forecasts;
+    @Autowired PlanningService planning;
     @Value("${local.server.port}") int port;
     CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
     HttpClient http = HttpClient.newBuilder().cookieHandler(cookies).build();
@@ -48,10 +51,11 @@ class ForecastIntegrationTest {
     @Test void reconciledIncomePartialDueAndReadOnlyScenario() throws Exception {
         LocalDate today = LocalDate.now(), tomorrow = today.plusDays(1), next = today.plusDays(2), third = today.plusDays(3);
         var owner = db.queryForObject("select id from app_users", UUID.class);
-        var account = id(); var income = id(); var expense = id(); var rule = id(); var secondRule = id();
+        var account = id(); var secondAccount = id(); var income = id(); var expense = id(); var rule = id(); var secondRule = id();
         var actual = id(); var occurrence = id(); var plan = id(); var due = id(); var payment = id(); var planned = id();
         var realizedPlanned = id(); var realizedActual = id();
         db.update("insert into cash_accounts(id,user_id,name,opening_balance,opening_date,created_at) values(?,?,?,0.00,?,now())", account, owner, "Cash", today.minusDays(30));
+        db.update("insert into cash_accounts(id,user_id,name,opening_balance,opening_date,created_at) values(?,?,?,-5.00,?,now())", secondAccount, owner, "Other cash", today.minusDays(30));
         db.update("insert into categories(id,user_id,name,kind,created_at) values(?,?,?,'INCOME',now())", income, owner, "Salary");
         db.update("insert into categories(id,user_id,name,kind,created_at) values(?,?,?,'EXPENSE',now())", expense, owner, "Rent");
         db.update("insert into transactions(id,user_id,account_id,category_id,direction,amount,transaction_date,note,created_at) values(?,?,?,?,'INCOME',100.00,?,'Received',now())", actual, owner, account, income, today);
@@ -77,14 +81,18 @@ class ForecastIntegrationTest {
         var response = request("/api/v1/forecasts/cashflow?from=" + today + "&to=" + third, null, null);
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("Extra income", "INSTALLMENT_DUE").doesNotContain("Linked salary");
-        assertThat(new BigDecimal(JsonPath.read(response.body(), "$.endingBalance").toString())).isEqualByComparingTo("50.00");
-        assertThat(new BigDecimal(JsonPath.read(response.body(), "$.lowestDailyBalance").toString())).isEqualByComparingTo("10.00");
+        assertThat(new BigDecimal(JsonPath.read(response.body(), "$.endingBalance").toString())).isEqualByComparingTo("45.00");
+        assertThat(new BigDecimal(JsonPath.read(response.body(), "$.lowestDailyBalance").toString())).isEqualByComparingTo("5.00");
         var baseline = forecasts.cashflow(owner, today, third);
+        assertThat(baseline.accountBalances()).hasSize(2).anyMatch(a -> a.accountId().equals(secondAccount) && a.currentBalance().compareTo(eur("-5.00")) == 0);
+        assertThat(baseline.startingDebt()).isEqualByComparingTo("80.00");
+        assertThat(baseline.days().getFirst().debtOutstanding()).isEqualByComparingTo("50.00");
+        assertThat(baseline.endingDebt()).isEqualByComparingTo("0.00");
         assertThat(baseline.events()).noneMatch(e -> realizedPlanned.equals(e.sourceId()));
         assertThat(baseline.events().stream().filter(e -> e.source().equals("INSTALLMENT_DUE")).map(Event::amount).toList()).containsExactly(eur("50.00"));
         var futureStart = forecasts.cashflow(owner, third, third);
-        assertThat(futureStart.startingBalance()).isEqualByComparingTo("60.00");
-        assertThat(futureStart.endingBalance()).isEqualByComparingTo("50.00");
+        assertThat(futureStart.startingBalance()).isEqualByComparingTo("55.00");
+        assertThat(futureStart.endingBalance()).isEqualByComparingTo("45.00");
         assertThat(futureStart.events()).noneMatch(e -> planned.equals(e.sourceId()));
         assertThat(futureStart.events()).anyMatch(e -> e.source().equals("INSTALLMENT_DUE") && e.date().equals(third));
         var before = db.queryForObject("select count(*) from transactions", Integer.class);
@@ -92,20 +100,29 @@ class ForecastIntegrationTest {
         var body = "{\"from\":\"" + today + "\",\"to\":\"" + third + "\",\"changes\":[{\"type\":\"ONE_TIME_EXPENSE\",\"amount\":5.00,\"date\":\"" + third + "\"}]}";
         var scenario = request("/api/v1/forecasts/scenarios", body, csrf);
         assertThat(scenario.statusCode()).isEqualTo(200);
-        assertThat(new BigDecimal(JsonPath.read(scenario.body(), "$.hypothetical.endingBalance").toString())).isEqualByComparingTo("45.00");
+        assertThat(new BigDecimal(JsonPath.read(scenario.body(), "$.hypothetical.endingBalance").toString())).isEqualByComparingTo("40.00");
         assertThat(db.queryForObject("select count(*) from transactions", Integer.class)).isEqualTo(before);
         assertThat(db.queryForObject("select count(*) from installment_payments", Integer.class)).isEqualTo(1);
         var newPlan = forecasts.scenario(owner, new ScenarioRequest(today, third,
             List.of(new Change("NEW_INSTALLMENT", eur("10.00"), null, next, 3, null))));
-        assertThat(newPlan.hypothetical().endingBalance()).isEqualByComparingTo("40.00");
+        assertThat(newPlan.hypothetical().endingBalance()).isEqualByComparingTo("35.00");
+        assertThat(newPlan.hypothetical().endingDebt()).isEqualByComparingTo("20.00");
         assertThat(newPlan.hypothetical().events()).anyMatch(e -> e.source().equals("HYPOTHETICAL_INSTALLMENT"));
         var reduction = forecasts.scenario(owner, new ScenarioRequest(today, third,
             List.of(new Change("INCOME_REDUCTION", eur("5.00"), third, null, null, secondRule))));
-        assertThat(reduction.hypothetical().endingBalance()).isEqualByComparingTo("45.00");
+        assertThat(reduction.hypothetical().endingBalance()).isEqualByComparingTo("40.00");
         assertThat(db.queryForObject("select count(*) from installment_plans", Integer.class)).isEqualTo(1);
         assertThat(request("/api/v1/forecasts/scenarios", body.replace("5.00", "0.001"), csrf).statusCode()).isEqualTo(422);
         assertThatThrownBy(() -> forecasts.scenario(id(), new ScenarioRequest(today, third,
             List.of(new Change("INCOME_REDUCTION", eur("1.00"), tomorrow, null, null, rule)))))
             .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        planning.createRule(owner, id(), new NewRule("Daily source", account, income, "INCOME", eur("1.00"),
+            "DAILY", tomorrow, tomorrow, null));
+        planning.createRule(owner, id(), new NewRule("Weekly source", account, expense, "EXPENSE", eur("2.00"),
+            "WEEKLY", tomorrow, tomorrow, null));
+        var schedules = forecasts.cashflow(owner, tomorrow, tomorrow.plusDays(7));
+        assertThat(schedules.events().stream().filter(e -> e.name().equals("Daily source"))).hasSize(8);
+        assertThat(schedules.events().stream().filter(e -> e.name().equals("Weekly source"))).hasSize(2);
+        assertThat(db.queryForObject("select count(*) from recurring_rules where frequency in ('DAILY','WEEKLY')", Integer.class)).isEqualTo(2);
     }
 }

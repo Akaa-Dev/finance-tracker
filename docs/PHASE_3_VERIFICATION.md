@@ -2,7 +2,7 @@
 
 ## Scope and result
 
-Phase 3 adds an authenticated owner-scoped forecast service and HTTP routes, exact daily/monthly cash projections, explicit source events, and read-only what-if scenarios. It reuses Phase 0–2 tables; no migration is needed. The Forecast page shows monthly chart/table, collapsible daily balances, source list, and one-change scenario comparison. Existing income actual, recurring rule and planned one-off forms support user-entered income sources; the page links to those flows and shows pending future income by source name.
+Phase 3 adds an authenticated owner-scoped forecast service and HTTP routes, exact daily/monthly cash projections, explicit source events, and read-only what-if scenarios. The original checkpoint reused Phase 0–2 tables without a migration. The Forecast page shows monthly chart/table, collapsible daily balances, source list, and one-change scenario comparison. Existing income actual, recurring rule and planned one-off forms support user-entered income sources; the page links to those flows and shows pending future income by source name.
 
 ## Baseline before edits
 
@@ -24,3 +24,20 @@ The forecast PostgreSQL test verifies authenticated GET and CSRF-protected POST,
 The desktop and 360px Forecast screenshots under ignored `frontend/test-results/` were visually inspected. The mobile view uses stacked summary cards and a chart, with scrollable exact-value tables. Browser fixtures from earlier cases share the disposable test owner, so the all-account forecast intentionally includes their balances and dues; assertions scope source names and check exact deltas rather than pretending a single-account total.
 
 Forecasts use current valid history and fixed nominal future amounts. Later voids/corrections restate earlier forecasts. An unlinked actual may overlap an expected future source; the API warns rather than applying a heuristic match. A linked source is considered fully realized even when the actual amount/date differs. The current UI compares one hypothetical change per request; the API accepts up to ten. There is no bank sync, multi-currency, variable interest, automatic transfer, persisted scenario, account filtering on forecasts, or archival forecast snapshot. No Firefox/WebKit or full screen-reader audit was performed. Phase 4 hardening remains open. Local older backend/Vite processes must be restarted to serve new routes; the task did not alter those user-managed processes.
+
+## Follow-up: schedules and cash/debt graph
+
+The follow-up adds the requested schedule selector for both income and expense expectations: DAILY, WEEKLY, MONTHLY, YEARLY or ONE_OFF, with a separate descriptive category. The Forecast form writes recurring rules or planned one-offs through the existing authenticated, CSRF-protected, idempotent APIs. Migration `004-recurring-frequency` expands the database check for DAILY/WEEKLY. Weekly occurrences retain the anchor weekday; daily occurrences include each eligible day. Both remain expectations and create no actual cash movement.
+
+The forecast response now includes `startingDebt`, `endingDebt`, daily/monthly `debtOutstanding` and each cash account's current derived actual balance. Its graph shows month-by-month combined cash across all accounts and remaining installment debt, with exact table values. Posted payments reduce debt once; projected dues reduce forecast debt without being posted. Hypothetical new installment commitments add debt in memory before their scheduled hypothetical repayments.
+
+Baseline before the follow-up: `./gradlew test --no-daemon` with temporary Gradle home **BUILD SUCCESSFUL in 3s** (up-to-date); frontend `npm run build` with pinned Node passed, **89 modules**, reported **529ms**.
+
+Final verification:
+
+- `GRADLE_USER_HOME=/private/tmp/finance-gradle ./gradlew clean test bootJar --no-daemon` in `backend/`: **BUILD SUCCESSFUL in 22s**, 7 tasks executed. XML reports **38 tests, 0 failures, 0 errors, 0 skipped**. New cases cover daily/weekly anchors and eligibility, accepted PostgreSQL frequency constraint, two-account cash aggregation, exact posted/projected debt progression, and hypothetical debt without a cash inflow.
+- `PATH=/private/tmp/node-v26.13.0-darwin-arm64/bin:$PATH npm run build` in `frontend/`: TypeScript/Vite passed; **89 modules transformed**, reported **643ms**, JS 354.81 kB (107.08 kB gzip), CSS 14.30 kB (3.96 kB gzip).
+- Disposable `./infrastructure/verify-browser.sh` with pinned Node/Java and temporary Gradle/Playwright paths: **6 passed (15.2s)** in desktop and 360×800 Chromium. It verifies the graph and exact debt column, account balance list, creation of a categorized weekly expense and one-off income from Forecast, their appearance as projected sources, and unchanged actual cash summary. The test container/processes were cleaned up.
+- `git diff --check`: passed after the follow-up edits.
+
+The graph is a projection. It assumes pending dues are paid on their projected dates; only posted payments alter actual balances or actual outstanding debt. The graph combines all accounts and includes account-free expected sources without assigning those expectations to an individual account. Browser coverage remains Chromium only; exhaustive accessibility and other browser engines remain Phase 4 work. Existing user-managed local servers were not restarted.

@@ -1,5 +1,7 @@
 # Phase 2 — ordinary actuals, balances and explicit reconciliation
 
+Phase 3 follow-up expanded recurring frequencies to DAILY and WEEKLY in addition to the MONTHLY/YEARLY contract described below; see `PHASE_3_API.md` for current schedule choices.
+
 All routes use `/api/v1`, the authenticated owner's session, and CSRF for mutations. UUID ownership comes from the session; DTOs never choose an owner. Money is JSON decimal, positive for actuals/plans, at most 17 integer digits and two fractional digits. Frontend money remains decimal text until emitted as JSON numbers; it is never summed with JavaScript floats.
 
 | Method | Route | Behavior |

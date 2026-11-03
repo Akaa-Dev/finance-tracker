@@ -50,7 +50,7 @@ function App() {
 }
 function Section({ name, email }: { name: string; email: string }) {
   return <><header><p className="eyebrow">PERSONAL WORKSPACE · EUR</p><h1>{name}</h1><p className="muted">{name === 'Dashboard' ? 'A clear view starts with your own records.' : 'Your private financial workspace.'}</p></header>
-    <div className="notice">Installments and actual transactions are available. Dashboard debt summaries and forecasts remain planned.</div>
+    <div className="notice">Installments, actual transactions and cash-flow forecasts are available. Dashboard debt summaries remain planned.</div>
     {name === 'Settings' ? <section className="panel"><h2>Owner account</h2><dl><dt>Email</dt><dd>{email}</dd><dt>Currency</dt><dd>EUR</dd></dl><p>Session authentication is active. Account editing and password recovery are not available in this phase.</p></section> :
     <section className="panel empty"><div className="symbol" aria-hidden="true">{name === 'Installments' ? '↗' : '○'}</div><h2>{name === 'Dashboard' ? 'Your workspace is ready' : `${name} are planned`}</h2>
     <p>{name === 'Dashboard' ? 'Open Transactions for as-of cash balances and actual movement summaries, or Forecast for future cash flow. Dashboard debt totals and recent activity remain planned.' : 'This section is not available yet.'}</p>

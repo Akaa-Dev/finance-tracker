@@ -114,6 +114,12 @@ public class ForecastService {
         LocalDate asOf = timelineStart.minusDays(1);
         BigDecimal initial = ForecastMath.ZERO;
         for (var account : data.accounts) initial = initial.add(ledger.balance(owner, account.id, asOf).currentBalance());
+        BigDecimal initialDebt = data.plans.stream().map(p -> p.totalPayable).reduce(ForecastMath.ZERO, BigDecimal::add);
+        for (var payment : data.payments) if (payment.voidedAt == null && !payment.paidOn.isAfter(asOf))
+            initialDebt = initialDebt.subtract(payment.amount);
+        List<AccountBalance> currentAccounts = data.accounts.stream()
+            .map(account -> new AccountBalance(account.id, account.name,
+                ledger.balance(owner, account.id, today).currentBalance())).toList();
         List<Event> events = new ArrayList<>();
         for (var account : data.accounts) if (!account.openingDate.isBefore(timelineStart) && !account.openingDate.isAfter(to))
             events.add(new Event(account.openingDate, "OPENING_BALANCE", account.id, account.name, account.openingBalance, account.openingDate.isAfter(today)));
@@ -132,7 +138,8 @@ public class ForecastService {
             projectedDues(data, planNames, carryStart, projectionStart, to, events);
             hypothetical(changes, projectionStart, to, events);
         }
-        return ForecastMath.project(from, to, to.isBefore(today) ? to : today, initial, events);
+        return ForecastMath.project(from, to, to.isBefore(today) ? to : today,
+            initial, initialDebt, currentAccounts, events);
     }
 
     private static boolean within(LocalDate date, LocalDate from, LocalDate to) {
@@ -185,6 +192,8 @@ public class ForecastService {
                 events.add(new Event(change.date(), "HYPOTHETICAL_EXPENSE", null, "What-if expense", amount(change.amount()), true));
             if ("NEW_INSTALLMENT".equals(change.type())) {
                 BigDecimal total = amount(change.amount()).multiply(BigDecimal.valueOf(change.installmentCount()));
+                events.add(new Event(from, "HYPOTHETICAL_OBLIGATION", null,
+                    "What-if total installment commitment", total, true));
                 for (var due : FixedSchedule.generate(total, change.installmentCount(), change.firstDueDate()))
                     if (within(due.dueDate(), from, to))
                         events.add(new Event(due.dueDate(), "HYPOTHETICAL_INSTALLMENT", null,

@@ -21,8 +21,16 @@ class OccurrenceDatesTest {
         assertThat(OccurrenceDates.between("YEARLY",d("2030-12-31"),d("2026-01-01"),null,d("2026-01-01"),d("2026-12-31")))
             .containsExactly(d("2026-12-31"));
     }
+    @Test void dailyIncludesEveryEligibleDay() {
+        assertThat(OccurrenceDates.between("DAILY",d("2026-01-01"),d("2026-02-02"),d("2026-02-04"),d("2026-02-01"),d("2026-02-05")))
+            .containsExactly(d("2026-02-02"),d("2026-02-03"),d("2026-02-04"));
+    }
+    @Test void weeklyKeepsAnchorWeekdayAcrossMonths() {
+        assertThat(OccurrenceDates.between("WEEKLY",d("2026-01-05"),d("2026-01-01"),null,d("2026-01-28"),d("2026-02-11")))
+            .containsExactly(d("2026-02-02"),d("2026-02-09"));
+    }
     @Test void rejectsUnboundedAndInvalidRanges() {
         assertThatThrownBy(()->OccurrenceDates.between("MONTHLY",d("2026-01-01"),d("2026-01-01"),null,d("2026-01-01"),d("2030-01-01"))).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(()->OccurrenceDates.between("WEEKLY",d("2026-01-01"),d("2026-01-01"),null,d("2026-01-01"),d("2026-02-01"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->OccurrenceDates.between("BOGUS",d("2026-01-01"),d("2026-01-01"),null,d("2026-01-01"),d("2026-02-01"))).isInstanceOf(IllegalArgumentException.class);
     }
 }

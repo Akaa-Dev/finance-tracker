@@ -7,7 +7,7 @@ public final class PlanningContracts {
     private PlanningContracts() {}
     public record NewRule(@NotBlank @Size(max=120) String name,UUID accountId,@NotNull UUID categoryId,
         @NotNull @Pattern(regexp="INCOME|EXPENSE") String direction,@NotNull @DecimalMin("0.01") @Digits(integer=17,fraction=2) BigDecimal amount,
-        @NotNull @Pattern(regexp="MONTHLY|YEARLY") String frequency,@NotNull LocalDate anchorDate,@NotNull LocalDate startDate,LocalDate endDate) {}
+        @NotNull @Pattern(regexp="DAILY|WEEKLY|MONTHLY|YEARLY") String frequency,@NotNull LocalDate anchorDate,@NotNull LocalDate startDate,LocalDate endDate) {}
     public record Active(@NotNull Boolean active) {}
     public record Range(@NotNull LocalDate from,@NotNull LocalDate to) {}
     public record NewPlanned(@NotBlank @Size(max=120) String name,UUID accountId,@NotNull UUID categoryId,

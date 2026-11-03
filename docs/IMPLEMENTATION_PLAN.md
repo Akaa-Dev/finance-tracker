@@ -48,6 +48,8 @@ Phase 2 accepted on 2026-11-03. Owner-scoped ordinary actuals, append-only corre
 
 Phase 3 accepted on 2026-11-03 against the disposable PostgreSQL/browser environments: source-itemized daily/monthly forecasts, realized-source suppression, partial/overdue due handling, and read-only what-if comparisons are implemented. The final clean backend suite passed 35 tests; the final desktop and 360px Chromium suite passed 6 cases. Hypothetical installment tests assert changed results and no stored plan/payment/transaction rows. See `PHASE_3_API.md` and `PHASE_3_VERIFICATION.md`. Phase 4 remains unchecked.
 
+Phase 3 follow-up on 2026-11-03: both income and expense expectations can now be entered from Forecast with a selected descriptive category and DAILY, WEEKLY, MONTHLY, YEARLY or ONE_OFF schedule. Migration `004-recurring-frequency` expands the recurring constraint without changing existing rows. The graph shows combined cash across all accounts and derived remaining installment debt by month, with each account's current actual balance alongside. The clean backend suite passed 38 tests and desktop/360px Chromium passed 6 cases. These are Phase 3 extensions; Phase 4 remains unchecked.
+
 ## Phase 4 — hardening
 - [ ] Session/CSRF and permission review, rate limiting where needed, errors/validation and logging hygiene.
 - [ ] Accessibility/mobile QA at 360px and desktop, loading/error/empty states.

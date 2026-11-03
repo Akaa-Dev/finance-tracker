@@ -21,7 +21,7 @@ Plan list and detail must show: total payable, paid amount, outstanding amount, 
 Select plan and cash account; amount, payment date, optional note; submit with an idempotency key. Allocate oldest unpaid due first. Allow partial, full, early, and multi-due payments. Return allocations, revised outstanding plan amount and amounts remaining per due. A due is `UPCOMING`, `DUE`, `PARTIALLY_PAID`, `OVERDUE`, or `PAID` derived from due date plus allocated amounts (partial overdue should show overdue as primary state and partial progress separately). Never overpay; preserve cents.
 
 ## Income, expenses, and cash accounts
-Track manual cash accounts with an opening balance and date. Track actual income/expense transactions including amount, category, date, account, note. Maintain recurring rules for salary, rent, utilities, subscriptions, etc., with frequency, anchor day/date, start/end and optional linked account. Track one-off planned future events separately. Distinguish actual payments from planned events; support linking a recurring occurrence to an actual transaction (or documented deterministic reconciliation) to avoid duplicates. All records owner-scoped.
+Track manual cash accounts with an opening balance and date. Track actual income/expense transactions including amount, category, date, account, note. For both income and expenses, let the owner choose a descriptive category and a schedule: daily, weekly, monthly, yearly, or one-off. Recurring rules retain anchor day/date, start/end and optional linked account; one-offs remain planned events. Distinguish actual payments from planned events; support linking a recurring occurrence to an actual transaction (or documented deterministic reconciliation) to avoid duplicates. All records owner-scoped.
 
 ## Dashboard
 - Current total cash balance from opening balances + eligible actual income - eligible actual expenses - valid installment payments.
@@ -33,6 +33,7 @@ Track manual cash accounts with an opening balance and date. Track actual income
 
 ## Forecasting
 Produce date-wise projection and monthly aggregates for horizon of 1–12 months: initial cash position, future recurring income and expenses, future one-off planned events, outstanding scheduled installment obligations, projected lowest balance, and monthly ending balances. Forecast from user's chosen date; for historical/in-current-month reconciliation distinguish actual booked cash movements from future projections. Overdue unpaid installments are projected as due immediately on the forecast start date. Do not double-count realized recurring occurrences and posted installment payments. v1 deterministic nominal values; no fuzzy AI forecasting.
+Show a month-by-month graph of projected combined cash across all cash accounts and remaining installment debt, with exact values and current actual balance for each cash account. A charted future due is a projected repayment, not a posted payment.
 
 Support an ephemeral what-if request with an additional fixed installment schedule, hypothetical one-off expense, or future income reduction; return baseline vs scenario by month and minimum daily balance. No persistence.
 

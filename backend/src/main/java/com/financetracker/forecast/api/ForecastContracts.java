@@ -15,14 +15,17 @@ public final class ForecastContracts {
                         boolean projected) {}
     public record Day(LocalDate date, BigDecimal income, BigDecimal ordinaryExpenses,
                       BigDecimal installmentRepayments, BigDecimal openingPositions,
-                      BigDecimal endingBalance) {}
+                      BigDecimal endingBalance, BigDecimal debtOutstanding) {}
     public record Month(String month, BigDecimal income, BigDecimal ordinaryExpenses,
                         BigDecimal installmentRepayments, BigDecimal openingPositions,
-                        BigDecimal endingBalance, BigDecimal lowestDailyBalance) {}
+                        BigDecimal endingBalance, BigDecimal lowestDailyBalance,
+                        BigDecimal debtOutstanding) {}
+    public record AccountBalance(UUID accountId, String name, BigDecimal currentBalance) {}
     public record Forecast(LocalDate from, LocalDate to, LocalDate actualThrough,
                            BigDecimal startingBalance, BigDecimal endingBalance,
-                           BigDecimal lowestDailyBalance, List<Event> events, List<Day> days,
-                           List<Month> months, String warning) {}
+                           BigDecimal lowestDailyBalance, BigDecimal startingDebt,
+                           BigDecimal endingDebt, List<AccountBalance> accountBalances,
+                           List<Event> events, List<Day> days, List<Month> months, String warning) {}
     public record MonthDelta(String month, BigDecimal endingBalanceDelta, BigDecimal lowestBalanceDelta) {}
     public record Scenario(Forecast baseline, Forecast hypothetical, List<MonthDelta> monthlyDeltas,
                            BigDecimal lowestBalanceDelta) {}

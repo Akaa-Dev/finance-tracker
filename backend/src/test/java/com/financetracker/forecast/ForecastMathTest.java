@@ -13,7 +13,7 @@ class ForecastMathTest {
     private static BigDecimal eur(String text) { return new BigDecimal(text); }
 
     @Test void dailyOrderCentsAndMonthBoundariesAreExact() {
-        var result = ForecastMath.project(day("2026-01-31"), day("2026-02-02"), day("2026-01-30"), eur("0.01"), List.of(
+        var result = ForecastMath.project(day("2026-01-31"), day("2026-02-02"), day("2026-01-30"), eur("0.01"), eur("0.02"), List.of(), List.of(
             new Event(day("2026-02-01"), "RECURRING_INCOME", null, "Income", eur("0.03"), true),
             new Event(day("2026-01-31"), "INSTALLMENT_DUE", null, "Due", eur("0.02"), true),
             new Event(day("2026-02-02"), "PLANNED_EXPENSE", null, "Expense", eur("0.01"), true)));
@@ -22,13 +22,22 @@ class ForecastMathTest {
         assertThat(result.lowestDailyBalance()).isEqualByComparingTo("-0.01");
         assertThat(result.months()).extracting(m -> m.month()).containsExactly("2026-01", "2026-02");
         assertThat(result.months().get(1).endingBalance()).isEqualByComparingTo("0.01");
+        assertThat(result.days()).extracting(d -> d.debtOutstanding().toPlainString()).containsExactly("0.00", "0.00", "0.00");
     }
 
     @Test void preRangeProjectedEventsCarryIntoVisibleStartingBalance() {
-        var result = ForecastMath.project(day("2026-02-02"), day("2026-02-02"), day("2026-01-31"), eur("10.00"), List.of(
+        var result = ForecastMath.project(day("2026-02-02"), day("2026-02-02"), day("2026-01-31"), eur("10.00"), eur("0.00"), List.of(), List.of(
             new Event(day("2026-02-01"), "RECURRING_EXPENSE", null, "Rent", eur("3.00"), true)));
         assertThat(result.startingBalance()).isEqualByComparingTo("7.00");
         assertThat(result.endingBalance()).isEqualByComparingTo("7.00");
         assertThat(result.events()).isEmpty();
+    }
+    @Test void hypotheticalCommitmentAddsDebtWithoutAddingCash() {
+        var result = ForecastMath.project(day("2026-02-01"), day("2026-02-02"), day("2026-01-31"), eur("100.00"), eur("0.00"), List.of(), List.of(
+            new Event(day("2026-02-01"), "HYPOTHETICAL_OBLIGATION", null, "New plan", eur("60.00"), true),
+            new Event(day("2026-02-02"), "HYPOTHETICAL_INSTALLMENT", null, "Due", eur("20.00"), true)));
+        assertThat(result.days()).extracting(d -> d.debtOutstanding().toPlainString()).containsExactly("60.00", "40.00");
+        assertThat(result.endingBalance()).isEqualByComparingTo("80.00");
+        assertThat(result.months().getFirst().debtOutstanding()).isEqualByComparingTo("40.00");
     }
 }
